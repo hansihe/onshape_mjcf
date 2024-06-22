@@ -1,0 +1,29 @@
+[tool.poetry]
+name = "onshape-mjcf"
+version = "0.1.0"
+description = ""
+authors = ["Hans Elias Bukholm Josephsen <hans@bukholm.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+tqdm = "^4.66.4"
+numpy = "^2.0.0"
+scipy = "^1.13.1"
+requests = "^2.32.3"
+networkx = "^3.3"
+keyvalue-sqlite = "^1.0.7"
+colorama = "^0.4.6"
+lxml = "^5.2.2"
+pint = "^0.24"
+commentjson = "^0.9.0"
+
+[tool.poetry.scripts]
+onshape-to-mjcf-basic = "onshape_mjcf:toMJCFBasicCommand"
+
+[tool.poetry.group.test.dependencies]
+pytest = "^8.2.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
