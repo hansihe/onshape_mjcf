@@ -1,10 +1,13 @@
 # onshape-mjcf
+Aims to provide everything you need to build a Onshape -> MJCF pipeline.
+
 This package contains 2 base areas of functionality, which function fairly independently:
 * Data structures, utilities and algorithms for reading and working with data from the Onhhape API.
 * Builder for MJCF files.
 
 On top of this, the library also provides:
 * Utilities for analyzing the topology of Onshape documents and transforming them into kinematic trees.
+* Basic Onshape -> MJCF conversion pipeline.
 
 A more complete list of features:
 * Abstract representation of both the raw CAD model and the inferred robot kinematic tree.
