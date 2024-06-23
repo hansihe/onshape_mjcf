@@ -40,14 +40,14 @@ class OnshapeCredentials:
         secret_key = os.getenv("ONSHAPE_SECRET_KEY")
 
         if url is None or access_key is None or secret_key is None:
-            raise """
+            raise Exception("""
             ERROR: No OnShape API access key set.
 
             TIP: Connect to https://dev-portal.onshape.com/keys, and edit your .bashrc file:
             export ONSHAPE_API=https://cad.onshape.com
             export ONSHAPE_ACCESS_KEY=Your_Access_Key
             export ONSHAPE_SECRET_KEY=Your_Secret_Key
-            """
+            """)
 
         return OnshapeCredentials(
             url=url,

@@ -4,7 +4,7 @@ ureg = pint.UnitRegistry()
 from onshape_mjcf.onshape_data import OnshapeData
 from onshape_mjcf.onshape_api.client import Client, OnshapeCredentials
 from onshape_mjcf.robot_description import RobotDescription
-from onshape_mjcf.to_mjcf_basic import toMJCFBasic
+from onshape_mjcf.to_mjcf_basic import MJCFBuildOptions, toMJCFBasic
 
 def toMJCFBasicCommand():
     import argparse

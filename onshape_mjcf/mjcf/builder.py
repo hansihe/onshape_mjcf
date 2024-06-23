@@ -142,6 +142,9 @@ class GeomBuilder(NameMixin, TransformMixin, BaseBuilder):
         assert value.shape == (2, 3)
         self.elem.set("fromto", " ".join(map(float_format, value.reshape(6))))
 
+class SiteBuilder(NameMixin, PositionMixin, BaseBuilder):
+    pass
+
 class BodyBuilder(NameMixin, TransformMixin, BaseBuilder):
     def body(self, name) -> Self:
         Ebody = E.body()
@@ -163,6 +166,11 @@ class BodyBuilder(NameMixin, TransformMixin, BaseBuilder):
         Egeom = E.geom()
         self.elem.append(Egeom)
         return GeomBuilder(Egeom)
+
+    def site(self) -> SiteBuilder:
+        Esite = E.site()
+        self.elem.append(Esite)
+        return SiteBuilder(Esite)
 
     @cached_property
     def inertial(self) -> InertialBuilder:

@@ -1,3 +1,4 @@
+from collections import defaultdict
 import hashlib
 import numpy as np
 import networkx as nx
@@ -187,6 +188,11 @@ class RobotComponent:
 
     partTree: dict[InstancePath, list[InstancePath]]
 
+    sites: list[Site]
+    """
+    Map from site idx to list of sites.
+    """
+
 @dataclass(frozen=True)
 class ComponentEdge:
     u: int
@@ -239,6 +245,7 @@ class RobotDescription:
                     assert instancePath.root == data.rootAssemblyId
                     parts.append(instancePath)
                     allPartRefs[lookup.archetype.ref] = instancePath
+            parts = sorted(parts)
 
             partTree = makeOccurranceTree(parts)
             commonRoots = findStrictSubtrees(rootInstanceTree, partTree)
@@ -251,7 +258,8 @@ class RobotDescription:
                 instances=comp,
                 parts=parts,
                 rootInstances=commonRoots,
-                partTree=partTree
+                partTree=partTree,
+                sites=None
             ))
 
         # Map DOFs to components
@@ -274,8 +282,13 @@ class RobotDescription:
             if dof.childComp == dof.parentComp:
                 raise Exception("Equality needs to be between two separate components, was to itself")
 
+        # Assign sites to components
+        sitesByIdx = defaultdict(list)
         for site in sites:
             site.parentComp = pathToComponentIdx[site.parent]
+            sitesByIdx[site.parentComp].append(site)
+        for idx, comp in enumerate(robotComponents):
+            comp.sites = sitesByIdx[idx]
 
         # Find root
         rootComponentIdx = None
@@ -342,5 +355,5 @@ class RobotDescription:
             componentEdges=componentEdges,
             components=robotComponents,
             meshes=partMap,
-            instanceTree=instanceTree
+            instanceTree=instanceTree,
         )

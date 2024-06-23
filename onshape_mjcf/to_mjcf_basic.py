@@ -1,16 +1,36 @@
+from dataclasses import dataclass, field
 import os
 from tqdm import tqdm
 import numpy as np
 
 from onshape_mjcf import RobotDescription
 from onshape_mjcf.mjcf.builder import BodyBuilder, MJCFBuilder
-from onshape_mjcf.onshape_data import OnshapeData
+from onshape_mjcf.onshape_data import InstancePath, OnshapeData
 from onshape_mjcf.onshape_data.inertial import calculateMassPropertiesByParts
 from onshape_mjcf.onshape_data.primitive_geom import CylinderGeom, SphereGeom, partToPrimitive
 from onshape_mjcf.util import formatName
 
-def buildMJCFBody(data: OnshapeData, description: RobotDescription, parent: BodyBuilder, compIdx: int, dofName=None, freeJoint=False):
-    comp = description.components[compIdx]
+@dataclass(kw_only=True)
+class MJCFBuildOptions:
+    geomNames: dict[tuple[str], str] = field(default_factory=dict)
+    """
+    Map from a path of names to a name in the resulting MJCF.
+
+    Key is a path of the names you see in the left of your Onshape CAD document.
+    Example: ("Body <1>", "Some Component <1>")
+    """
+
+def transformPos(transform: np.array, pos: np.array):
+    return (transform @ np.pad(pos, (0, 1), constant_values=1))[:3]
+
+@dataclass
+class BuildData:
+    data: OnshapeData
+    description: RobotDescription
+    pathToGeomName: dict[InstancePath, str]
+
+def buildMJCFBody(bd: BuildData, parent: BodyBuilder, compIdx: int, dofName=None, freeJoint=False):
+    comp = bd.description.components[compIdx]
     name = formatName(comp.name)
     body = parent.body(name)
 
@@ -18,10 +38,10 @@ def buildMJCFBody(data: OnshapeData, description: RobotDescription, parent: Body
         body.freeJoint()
 
     if dofName is not None:
-        dof = description.dofs[dofName]
+        dof = bd.description.dofs[dofName]
         joint = body.joint()
         joint.name = dofName
-        joint.frictionloss = 0.01
+        #joint.frictionloss = 0.01
 
         joint.axis = np.asarray(dof.jointTransform[:3, :3]) @ np.array([0, 0, 1])
         joint.pos = np.asarray(dof.jointTransform)[:3, 3]
@@ -35,14 +55,23 @@ def buildMJCFBody(data: OnshapeData, description: RobotDescription, parent: Body
         if dof.limits is not None:
             joint.range = dof.limits
 
+    for site in comp.sites:
+        siteE = body.site()
+        siteE.name = site.name
+        siteE.pos = site.transform[:3, 3]
+
     for path in comp.parts:
-        lookup = data[path]
-        mesh = description.meshes[lookup.archetype.ref]
+        lookup = bd.data[path]
+        mesh = bd.description.meshes[lookup.archetype.ref]
 
         geom = body.geom()
 
+        name = bd.pathToGeomName.get(path)
+        if name is not None:
+            geom.name = name
+
         if mesh.originalName.startswith("Collider "):
-            primitive = partToPrimitive(data, lookup.archetype.ref)
+            primitive = partToPrimitive(bd.data, lookup.archetype.ref)
 
             if isinstance(primitive, SphereGeom):
                 geom.type = "sphere"
@@ -65,17 +94,27 @@ def buildMJCFBody(data: OnshapeData, description: RobotDescription, parent: Body
             geom.transform = lookup.occurrence.transform
             geom.mesh = mesh.uniqueName
 
-    inertial = calculateMassPropertiesByParts(data.client, data, description, comp.rootInstances) #, overrides=inertialOverrides)
+    inertial = calculateMassPropertiesByParts(bd.data.client, bd.data, bd.description, comp.rootInstances) #, overrides=inertialOverrides)
 
     body.inertial.pos = inertial.centroid
     body.inertial.mass = inertial.mass
     body.inertial.inertia = inertial.inertia
 
-    for edge in description.componentEdges[compIdx]:
-        buildMJCFBody(data, description, body, edge.v, dofName=edge.dofName)
+    for edge in bd.description.componentEdges[compIdx]:
+        buildMJCFBody(bd, body, edge.v, dofName=edge.dofName)
 
-def toMJCFBasic(data: OnshapeData, description: RobotDescription, writeMeshes=True):
+def toMJCFBasic(data: OnshapeData, description: RobotDescription, options=MJCFBuildOptions(), writeMeshes=True):
     mjcf = MJCFBuilder()
+
+    pathToGeomName = {}
+    for namePath, name in options.geomNames.items():
+        pathToGeomName[data.occurranceNamePaths[namePath]] = name
+
+    bd = BuildData(
+        data=data,
+        description=description,
+        pathToGeomName=pathToGeomName
+    )
 
     if writeMeshes:
         os.makedirs("models", exist_ok=True)
@@ -101,6 +140,6 @@ def toMJCFBasic(data: OnshapeData, description: RobotDescription, writeMeshes=Tr
         elem.body2 = description.components[equality.rightComp].name
 
     # Build robot kinematic tree XML recursively
-    buildMJCFBody(data, description, mjcf.worldBody, description.rootComponentIdx, freeJoint=True)
+    buildMJCFBody(bd, mjcf.worldBody, description.rootComponentIdx, freeJoint=True)
 
     return mjcf

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from functools import cached_property
+import itertools
 import json
 from typing import Self
 import numpy as np
@@ -276,10 +277,11 @@ class PartInstance(Instance):
 
 @dataclass(frozen=True)
 class Assembly:
+    type = "assembly"
     ref: QualifiedRef
     instances: dict[InstanceId, Instance]
+    instanceByName: dict[str, InstanceId]
     features: dict[FeatureId, AssemblyFeature]
-    #patterns: any
 
     @classmethod
     def from_json(cls, data: dict):
@@ -309,14 +311,21 @@ class Assembly:
                 raise Exception("unknown feature type: " + featureType)
             features[mateFeature.id] = mateFeature
 
+        instanceByName = {}
+        for instance in instances.values():
+            assert instance.name not in instanceByName
+            instanceByName[instance.name] = instance.id
+
         return cls(
             ref=ref,
             instances=instances,
+            instanceByName=instanceByName,
             features=features
         )
 
 @dataclass(frozen=True)
 class Part:
+    type = "part"
     isStandardContent: bool
     bodyType: str
     ref: PartRef
@@ -578,6 +587,28 @@ class OnshapeData:
                 linkDocumentId=self.rootAssemblyId.documentId, 
                 useMassPropertyOverrides=True
             )
+
+    @cached_property
+    def occurranceNamePaths(self) -> dict[tuple[str], InstancePath]:
+        result = {}
+
+        def traverse(inst: InstanceId, path: tuple[InstanceId], namePath: tuple[str]):
+            lookup = self[inst]
+
+            subPath = tuple(itertools.chain(path, [inst]))
+            subNamePath = tuple(itertools.chain(namePath, [lookup.instance.name]))
+
+            assert subNamePath not in result
+            result[subNamePath] = InstancePath(self.rootAssemblyId, subPath)
+
+            if lookup.archetype.type == "assembly":
+                for sub in lookup.archetype.instances.values():
+                    traverse(sub.id, subPath, subNamePath)
+
+        for instanceId in self[self.rootAssemblyId].archetype.instances.keys():
+            traverse(instanceId, tuple(), tuple())
+
+        return result
 
     @cached_property
     def instances(self) -> dict[InstanceId, Instance]:
